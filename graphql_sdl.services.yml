@@ -1,0 +1,19 @@
+services:
+  # Cache bin for the parsed sdl ast.
+  cache.graphql_sdl.ast:
+    class: Drupal\Core\Cache\CacheBackendInterface
+    tags:
+      - { name: cache.bin }
+    factory: cache_factory:get
+    arguments: [graphql_sdl_ast]
+
+  plugin.manager.graphql_sdl.data_producer:
+    class: Drupal\graphql_sdl\Plugin\DataProducerPluginManager
+    arguments:
+      - 'Plugin/GraphQL/DataProducer'
+      - '@container.namespaces'
+      - '@module_handler'
+      - '@cache.graphql.definitions'
+      - '\Drupal\graphql_sdl\Plugin\DataProducerPluginInterface'
+      - '\Drupal\graphql_sdl\Annotation\DataProducer'
+      - '%graphql.config%'

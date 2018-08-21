@@ -1,0 +1,5 @@
+name: GraphQL SDL
+type: module
+description: 'Adds support for SDL based schemas.'
+package: GraphQL
+core: 8.x
