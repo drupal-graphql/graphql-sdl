@@ -105,7 +105,7 @@ class ResolverBuilder {
 
   /**
    * @param $name
-   * @param null $default
+   * @param callable|null $default
    *
    * @return \Closure
    */
