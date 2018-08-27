@@ -44,12 +44,17 @@ class ResolverBuilder {
 
   /**
    * @param $name
-   * @param string $source
+   * @param callable|null $source
    *
    * @return \Closure
    */
-  public function context($name, $source = 'parent') {
+  public function context($name, callable $source = NULL) {
     return $this->tap(function ($value, $args, ResolveContext $context, ResolveInfo $info) use ($name, $source) {
+      if (!isset($source)) {
+        $source = $this->fromParent();
+      }
+
+      $value = $source($value, $args, $context, $info);
       $context->setContext($name, $value, $info);
     });
   }
