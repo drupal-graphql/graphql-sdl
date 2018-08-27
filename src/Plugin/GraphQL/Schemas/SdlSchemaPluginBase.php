@@ -16,6 +16,7 @@ use GraphQL\Language\AST\UnionTypeDefinitionNode;
 use GraphQL\Language\Parser;
 use GraphQL\Server\OperationParams;
 use GraphQL\Server\RequestError;
+use GraphQL\Server\ServerConfig;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Validator\DocumentValidator;
@@ -81,20 +82,6 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
   /**
    * {@inheritdoc}
    */
-  public function allowsQueryBatching() {
-    return TRUE;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function inDebug() {
-    return $this->inDebug;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getSchema() {
     return BuildSchema::build($this->getSchemaDocument(), function ($config, TypeDefinitionNode $type) {
       if ($type instanceof InterfaceTypeDefinitionNode || $type instanceof UnionTypeDefinitionNode) {
@@ -108,14 +95,99 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
   /**
    * {@inheritdoc}
    */
-  public function getRootValue() {
+  public function getServer() {
+    // Create the server config.
+    $config = ServerConfig::create();
+    $config->setContext($this->getContext());
+    $config->setValidationRules($this->getValidationRules());
+    $config->setPersistentQueryLoader($this->getPersistedQueryLoader());
+    $config->setRootValue($this->getRootValue());
+    $config->setQueryBatching($this->allowsQueryBatching());
+    $config->setDebug($this->inDebug());
+    $config->setSchema($this->getSchema());
+
+    if ($resolver = $this->getFieldResolver()) {
+      $config->setFieldResolver($resolver);
+    }
+
+    return $config;
+  }
+
+  /**
+   * Returns whether the schema allows query batching.
+   *
+   * @return boolean
+   *   TRUE if query batching is allowed, FALSE otherwise.
+   */
+  protected function allowsQueryBatching() {
+    return TRUE;
+  }
+
+  /**
+   * Returns whether the schema should output debugging information.
+   *
+   * Returning TRUE will add detailed error information to any error messages
+   * returned during query execution.
+   *
+   * @return boolean
+   *   TRUE if currently in development mode, FALSE otherwise.
+   */
+  protected function inDebug() {
+    return $this->inDebug;
+  }
+
+  /**
+   * Returns to root value to use when resolving queries against the schema.
+   *
+   * May return a callable to resolve the root value at run-time based on the
+   * provided query parameters / operation.
+   *
+   * @code
+   *
+   * public function getRootValue() {
+   *   return function (OperationParams $params, DocumentNode $document, $operation) {
+   *     // Dynamically return a root value based on the current query.
+   *   };
+   * }
+   *
+   * @endcode
+   *
+   * @return mixed|callable
+   *   The root value for query execution or a callable factory.
+   */
+  protected function getRootValue() {
     return NULL;
   }
 
   /**
-   * {@inheritdoc}
+   * Returns the context object to use during query execution.
+   *
+   * May return a callable to instantiate a context object for each individual
+   * query instead of a shared context. This may be useful e.g. when running
+   * batched queries where each query operation within the same request should
+   * use a separate context object.
+   *
+   * The returned value will be passed as an argument to every type and field
+   * resolver during execution.
+   *
+   * @code
+   *
+   * public function getContext() {
+   *   $shared = ['foo' => 'bar'];
+   *
+   *   return function (OperationParams $params, DocumentNode $document, $operation) use ($shared) {
+   *     $private = ['bar' => 'baz'];
+   *
+   *     return new MyContext($shared, $private);
+   *   };
+   * }
+   *
+   * @endcode
+   *
+   * @return mixed|callable
+   *   The context object for query execution or a callable factory.
    */
-  public function getContext() {
+  protected function getContext() {
     $registry = $this->getResolverRegistry();
 
     // Each document (e.g. in a batch query) gets its own resolve context. This
@@ -135,25 +207,54 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
   /**
    * {@inheritdoc}
    */
-  public function getTypeResolver(TypeDefinitionNode $type) {
+  protected function getTypeResolver(TypeDefinitionNode $type) {
     return function ($value, ResolveContext $context, ResolveInfo $info) {
       return $context->getGlobal('registry')->resolveType($value, $context, $info);
     };
   }
 
   /**
-   * {@inheritdoc}
+   * Returns the default field resolver.
+   *
+   * Fields that don't explicitly declare a field resolver will use this one
+   * as a fallback.
+   *
+   * @return null|callable
+   *   The default field resolver.
    */
-  public function getFieldResolver() {
+  protected function getFieldResolver() {
     return function ($value, $args, ResolveContext $context, ResolveInfo $info) {
       return $context->getGlobal('registry')->resolveField($value, $args, $context, $info);
     };
   }
 
   /**
-   * {@inheritdoc}
+   * Returns the validation rules to use for the query.
+   *
+   * May return a callable to allow the schema to decide the validation rules
+   * independently for each query operation.
+   *
+   * @code
+   *
+   * public function getValidationRules() {
+   *   return function (OperationParams $params, DocumentNode $document, $operation) {
+   *     if (isset($params->queryId)) {
+   *       // Assume that pre-parsed documents are already validated. This allows
+   *       // us to store pre-validated query documents e.g. for persisted queries
+   *       // effectively improving performance by skipping run-time validation.
+   *       return [];
+   *     }
+   *
+   *     return array_values(DocumentValidator::defaultRules());
+   *   };
+   * }
+   *
+   * @endcode
+   *
+   * @return array|callable
+   *   The validation rules or a callable factory.
    */
-  public function getValidationRules() {
+  protected function getValidationRules() {
     return function (OperationParams $params, DocumentNode $document, $operation) {
       if (isset($params->queryId)) {
         // Assume that pre-parsed documents are already validated. This allows
@@ -167,9 +268,12 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
   }
 
   /**
-   * {@inheritdoc}
+   * Returns a callable for loading persisted queries.
+   *
+   * @return callable
+   *   The persisted query loader.
    */
-  public function getPersistedQueryLoader() {
+  protected function getPersistedQueryLoader() {
     return function ($id, OperationParams $params) {
       throw new RequestError('Persisted queries are currently not supported');
     };
@@ -182,12 +286,15 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
    *   The parsed schema document.
    */
   protected function getSchemaDocument() {
-    if (!$this->inDebug() && $cache = $this->astCache->get($this->getPluginId())) {
+    // Only use caching of the parsed document if aren't in development mode.
+    $useCache = !$this->inDebug();
+
+    if (!empty($useCache) && $cache = $this->astCache->get($this->getPluginId())) {
       return $cache->data;
     }
 
     $ast = Parser::parse($this->getSchemaDefinition());
-    if (!$this->inDebug()) {
+    if (!empty($useCache)) {
       $this->astCache->set($this->getPluginId(), $ast, CacheBackendInterface::CACHE_PERMANENT, ['graphql']);
     }
 
