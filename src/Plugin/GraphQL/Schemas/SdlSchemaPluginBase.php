@@ -9,6 +9,7 @@ use Drupal\Core\Cache\RefinableCacheableDependencyTrait;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\graphql\GraphQL\Execution\ResolveContext;
 use Drupal\graphql\Plugin\SchemaPluginInterface;
+use GraphQL\Error\InvariantViolation;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
 use GraphQL\Language\AST\TypeDefinitionNode;
@@ -90,6 +91,34 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
 
       return $config;
     });
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function validateSchema() {
+    /** @var \Drupal\Core\Messenger\MessengerInterface $messenger */
+    $messenger = \Drupal::service('messenger');
+    $schema = $this->getSchema();
+
+    try {
+      $schema->assertValid();
+    } catch (InvariantViolation $error) {
+      $messenger->addError($error->getMessage());
+
+      return FALSE;
+    }
+
+    $registry = $this->getResolverRegistry();
+    if ($messages = $registry->validateCompliance($schema)) {
+      foreach ($messages as $message) {
+        $messenger->addError($message);
+      }
+
+      return FALSE;
+    }
+
+    return TRUE;
   }
 
   /**
@@ -304,8 +333,8 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
   /**
    * Retrieves the resolver registry.
    *
-   * @return string
-   *   The schema definition.
+   * @return \Drupal\graphql_sdl\GraphQL\ResolverRegistryInterface
+   *   The resolver registry.
    */
   abstract protected function getResolverRegistry();
 
