@@ -3,10 +3,12 @@
 namespace Drupal\graphql_sdl\Plugin\GraphQL\DataProducer;
 
 use Drupal\Component\Plugin\ConfigurablePluginInterface;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\graphql\GraphQL\Execution\ResolveContext;
+use Drupal\graphql\GraphQL\ValueWrapperInterface;
 use Drupal\graphql_sdl\Plugin\DataProducerPluginInterface;
 use GraphQL\Type\Definition\ResolveInfo;
 
@@ -27,7 +29,20 @@ class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInt
     }
 
     $values = $this->getConsumedValues($value, $args, $context, $info);
-    return call_user_func_array([$this, 'resolve'], $values);
+    $output = call_user_func_array([$this, 'resolve'], $values);
+    while ($output instanceof ValueWrapperInterface) {
+      if ($output instanceof CacheableDependencyInterface) {
+        $context->addCacheableDependency($output);
+      }
+
+      $output = $output->getValue();
+    }
+
+    if ($output instanceof CacheableDependencyInterface) {
+      $context->addCacheableDependency($output);
+    }
+
+    return $output;
   }
 
   /**

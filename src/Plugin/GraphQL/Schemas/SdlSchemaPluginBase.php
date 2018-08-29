@@ -10,6 +10,7 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\graphql\GraphQL\Execution\ResolveContext;
 use Drupal\graphql\Plugin\SchemaPluginInterface;
 use GraphQL\Error\InvariantViolation;
+use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
 use GraphQL\Language\AST\TypeDefinitionNode;
@@ -82,6 +83,9 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
 
   /**
    * {@inheritdoc}
+   *
+   * @throws \GraphQL\Error\SyntaxError
+   *   If the schema is invalid.
    */
   public function getSchema() {
     return BuildSchema::build($this->getSchemaDocument(), function ($config, TypeDefinitionNode $type) {
@@ -99,13 +103,17 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
   public function validateSchema() {
     /** @var \Drupal\Core\Messenger\MessengerInterface $messenger */
     $messenger = \Drupal::service('messenger');
-    $schema = $this->getSchema();
 
     try {
+      $schema = $this->getSchema();
       $schema->assertValid();
-    } catch (InvariantViolation $error) {
-      $messenger->addError($error->getMessage());
-
+    }
+    catch (SyntaxError $error) {
+      $messenger->addError(sprintf('Syntax error in schema: %s', $error->getMessage()));
+      return FALSE;
+    }
+    catch (InvariantViolation $error) {
+      $messenger->addError(sprintf('Schema validation error: %s', $error->getMessage()));
       return FALSE;
     }
 
@@ -313,6 +321,8 @@ abstract class SdlSchemaPluginBase extends PluginBase implements SchemaPluginInt
    *
    * @return \GraphQL\Language\AST\DocumentNode
    *   The parsed schema document.
+   *
+   * @throws \GraphQL\Error\SyntaxError
    */
   protected function getSchemaDocument() {
     // Only use caching of the parsed document if aren't in development mode.

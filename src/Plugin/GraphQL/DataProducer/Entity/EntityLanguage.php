@@ -7,11 +7,11 @@ use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
 
 /**
  * @DataProducer(
- *   id = "entity_id",
- *   name = @Translation("Entity identifier"),
- *   description = @Translation("Returns the entity identifier."),
- *   produces = @ContextDefinition("string",
- *     label = @Translation("Identifier")
+ *   id = "entity_language",
+ *   name = @Translation("Entity language"),
+ *   description = @Translation("Returns the entity language."),
+ *   produces = @ContextDefinition("language",
+ *     label = @Translation("Language")
  *   ),
  *   consumes = {
  *     "entity" = @ContextDefinition("entity",
@@ -20,15 +20,15 @@ use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
  *   }
  * )
  */
-class Id extends DataProducerPluginBase {
+class EntityLanguage extends DataProducerPluginBase {
 
   /**
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *
-   * @return mixed
+   * @return \Drupal\Core\Language\LanguageInterface
    */
   public function resolve(EntityInterface $entity) {
-    return $entity->id();
+    return $entity->language();
   }
 
 }

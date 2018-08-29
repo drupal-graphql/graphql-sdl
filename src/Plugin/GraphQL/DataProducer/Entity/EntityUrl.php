@@ -7,11 +7,11 @@ use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
 
 /**
  * @DataProducer(
- *   id = "entity_label",
- *   name = @Translation("Entity label"),
- *   description = @Translation("Returns the entity label."),
- *   produces = @ContextDefinition("string",
- *     label = @Translation("Identifier")
+ *   id = "entity_url",
+ *   name = @Translation("Entity url"),
+ *   description = @Translation("Returns the entity's url."),
+ *   produces = @ContextDefinition("any",
+ *     label = @Translation("Url")
  *   ),
  *   consumes = {
  *     "entity" = @ContextDefinition("entity",
@@ -20,15 +20,16 @@ use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
  *   }
  * )
  */
-class Label extends DataProducerPluginBase {
+class EntityUrl extends DataProducerPluginBase {
 
   /**
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *
-   * @return mixed
+   * @return \Drupal\Core\Url
+   * @throws \Drupal\Core\Entity\EntityMalformedException
    */
   public function resolve(EntityInterface $entity) {
-    return $entity->label();
+    return $entity->toUrl();
   }
 
 }
