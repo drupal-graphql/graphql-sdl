@@ -17,7 +17,10 @@ class ResolverBuilder {
   public function compose(callable ...$resolvers) {
     return function ($value, $args, ResolveContext $context, ResolveInfo $info) use ($resolvers) {
       while ($resolver = array_shift($resolvers)) {
-        $value = $resolver($value, $args, $context, $info);
+        if (($value = $resolver($value, $args, $context, $info)) === NULL) {
+          // Bail out early if a resolver returns NULL.
+          return NULL;
+        }
 
         if ($value instanceof Deferred) {
           return DeferredUtility::applyFinally($value, function ($value) use ($resolvers, $args, $context, $info) {
