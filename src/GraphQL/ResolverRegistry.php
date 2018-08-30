@@ -223,7 +223,7 @@ class ResolverRegistry implements ResolverRegistryInterface {
    *
    * @return $this
    */
-  public function addTypeResolvers($abstract, callable $resolver) {
+  public function addTypeResolver($abstract, callable $resolver) {
     $this->typeResolvers[$abstract] = $resolver;
     return $this;
   }
