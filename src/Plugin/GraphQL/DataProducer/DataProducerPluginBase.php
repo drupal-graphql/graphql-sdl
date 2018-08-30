@@ -10,6 +10,8 @@ use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\graphql\GraphQL\Execution\ResolveContext;
 use Drupal\graphql\GraphQL\ValueWrapperInterface;
 use Drupal\graphql_sdl\Plugin\DataProducerPluginInterface;
+use Drupal\graphql_sdl\Utility\DeferredUtility;
+use GraphQL\Deferred;
 use GraphQL\Type\Definition\ResolveInfo;
 
 class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInterface, PluginFormInterface, DataProducerPluginInterface {
@@ -30,19 +32,22 @@ class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInt
 
     $values = $this->getConsumedValues($value, $args, $context, $info);
     $output = call_user_func_array([$this, 'resolve'], $values);
-    while ($output instanceof ValueWrapperInterface) {
-      if ($output instanceof CacheableDependencyInterface) {
-        $context->addCacheableDependency($output);
+
+    return DeferredUtility::applyFinally($output, function ($value) use ($context) {
+      while ($value instanceof ValueWrapperInterface) {
+        if ($value instanceof CacheableDependencyInterface) {
+          $context->addCacheableDependency($value);
+        }
+
+        $value = $value->getValue();
       }
 
-      $output = $output->getValue();
-    }
+      if ($value instanceof CacheableDependencyInterface) {
+        $context->addCacheableDependency($value);
+      }
 
-    if ($output instanceof CacheableDependencyInterface) {
-      $context->addCacheableDependency($output);
-    }
-
-    return $output;
+      return $value;
+    });
   }
 
   /**

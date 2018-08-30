@@ -61,10 +61,7 @@ class ResolverBuilder {
    */
   public function context($name, callable $source = NULL) {
     return $this->tap(function ($value, $args, ResolveContext $context, ResolveInfo $info) use ($name, $source) {
-      if (!isset($source)) {
-        $source = $this->fromParent();
-      }
-
+      $source = $source ?? $this->fromParent();
       $value = $source($value, $args, $context, $info);
       $context->setContext($name, $value, $info);
     });
