@@ -2,12 +2,12 @@
 
 namespace Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\Entity;
 
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManager;
 use Drupal\Core\Entity\TranslatableInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\graphql\GraphQL\Buffers\EntityBuffer;
-use Drupal\graphql\GraphQL\Cache\CacheableValue;
 use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
 use GraphQL\Deferred;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -112,37 +112,42 @@ class EntityLoad extends DataProducerPluginBase implements ContainerFactoryPlugi
    * @param $id
    * @param null $language
    * @param null $bundles
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface $metadata
    *
    * @return \GraphQL\Deferred
    */
-  public function resolve($type, $id, $language = NULL, $bundles = NULL) {
+  public function resolve($type, $id, $language = NULL, $bundles = NULL, RefinableCacheableDependencyInterface $metadata) {
     $resolver = $this->entityBuffer->add($type, $id);
 
-    return new Deferred(function () use ($type, $id, $language, $bundles, $resolver) {
+    return new Deferred(function () use ($type, $id, $language, $bundles, $resolver, $metadata) {
       if (!$entity = $resolver()) {
         // If there is no entity with this id, add the list cache tags so that the
         // cache entry is purged whenever a new entity of this type is saved.
         $tags = $this->entityTypeManager->getDefinition($type)->getListCacheTags();
-        return (new CacheableValue(NULL))->addCacheTags($tags);
+        $metadata->addCacheTags($tags);
+        return NULL;
       }
 
       if (isset($bundles) && !in_array($entity->bundle(), $bundles)) {
         // If the entity is not among the allowed bundles, don't return it.
-        return new CacheableValue(NULL, [$entity]);
+        $metadata->addCacheableDependency($entity);
+        return NULL;
       }
 
       /** @var \Drupal\Core\Entity\EntityInterface $entity */
       $access = $entity->access('view', NULL, TRUE);
+      $metadata->addCacheableDependency($access);
+
       if ($access->isAllowed()) {
         if (isset($language) && $language != $entity->language()->getId() && $entity instanceof TranslatableInterface) {
           $entity = $entity->getTranslation($language);
         }
 
-        return $entity->addCacheableDependency($access);
+        return $entity;
       }
-      else {
-        return new CacheableValue(NULL, [$access]);
-      }
+
+
+      return NULL;
     });
   }
 }

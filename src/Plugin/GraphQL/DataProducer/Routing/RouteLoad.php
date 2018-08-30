@@ -2,9 +2,9 @@
 
 namespace Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\Routing;
 
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Path\PathValidatorInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\graphql\GraphQL\Cache\CacheableValue;
 use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -69,14 +69,18 @@ class RouteLoad extends DataProducerPluginBase implements ContainerFactoryPlugin
   }
 
   /**
-   * {@inheritdoc}
+   * @param $path
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface $metadata
+   *
+   * @return \Drupal\Core\Url|null
    */
-  public function resolve($path) {
+  public function resolve($path, RefinableCacheableDependencyInterface $metadata) {
     if (($url = $this->pathValidator->getUrlIfValidWithoutAccessCheck($path)) && $url->isRouted() && $url->access()) {
       return $url;
     }
 
-    return (new CacheableValue(NULL))->addCacheTags(['4xx-response']);
+    $metadata->addCacheTags(['4xx-response']);
+    return NULL;
   }
 
 }

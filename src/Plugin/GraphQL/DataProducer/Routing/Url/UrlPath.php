@@ -2,8 +2,8 @@
 
 namespace Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\Routing\Url;
 
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Url;
-use Drupal\graphql\GraphQL\Cache\CacheableValue;
 use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
 
 /**
@@ -27,12 +27,15 @@ class UrlPath extends DataProducerPluginBase {
 
   /**
    * @param \Drupal\Core\Url $url
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface $metadata
    *
-   * @return \Drupal\graphql\GraphQL\Cache\CacheableValue
+   * @return string
    */
-  public function resolve(Url $url) {
+  public function resolve(Url $url, RefinableCacheableDependencyInterface $metadata) {
     $url = $url->toString(TRUE);
-    return new CacheableValue($url->getGeneratedUrl(), [$url]);
+    $metadata->addCacheableDependency($url);
+
+    return $url->getGeneratedUrl();
   }
 
 }

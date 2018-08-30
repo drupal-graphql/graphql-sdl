@@ -2,13 +2,13 @@
 
 namespace Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\Entity;
 
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
-use Drupal\graphql\GraphQL\Cache\CacheableValue;
 use Drupal\graphql_sdl\Plugin\GraphQL\DataProducer\DataProducerPluginBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -86,10 +86,11 @@ class EntityRendered extends DataProducerPluginBase implements ContainerFactoryP
   /**
    * @param \Drupal\Core\Entity\EntityInterface $entity
    * @param string|null $mode
+   * @param \Drupal\Core\Cache\RefinableCacheableDependencyInterface $metadata
    *
-   * @return \Drupal\graphql\GraphQL\Cache\CacheableValue|string
+   * @return string
    */
-  public function resolve(EntityInterface $entity, $mode = NULL) {
+  public function resolve(EntityInterface $entity, $mode = NULL, RefinableCacheableDependencyInterface $metadata) {
     $mode = $mode ?? 'full';
     $builder = $this->entityTypeManager->getViewBuilder($entity->getEntityTypeId());
     $view = $builder->view($entity, $mode, $entity->language()->getId());
@@ -101,7 +102,7 @@ class EntityRendered extends DataProducerPluginBase implements ContainerFactoryP
     });
 
     if (!$context->isEmpty()) {
-      return new CacheableValue((string) $result, [$context->pop()]);
+      $metadata->addCacheableDependency($context->pop());
     }
 
     return (string) $result;

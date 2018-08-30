@@ -4,17 +4,16 @@ namespace Drupal\graphql_sdl\Plugin\GraphQL\DataProducer;
 
 use Drupal\Component\Plugin\ConfigurablePluginInterface;
 use Drupal\Core\Cache\CacheableDependencyInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\PluginBase;
 use Drupal\Core\Plugin\PluginFormInterface;
 use Drupal\graphql\GraphQL\Execution\ResolveContext;
-use Drupal\graphql\GraphQL\ValueWrapperInterface;
-use Drupal\graphql_sdl\Plugin\DataProducerPluginInterface;
+use Drupal\graphql_sdl\Plugin\CacheableDataProducerPluginInterface;
 use Drupal\graphql_sdl\Utility\DeferredUtility;
-use GraphQL\Deferred;
 use GraphQL\Type\Definition\ResolveInfo;
 
-class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInterface, PluginFormInterface, DataProducerPluginInterface {
+class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInterface, PluginFormInterface, CacheableDataProducerPluginInterface {
 
   /**
    * @param $value
@@ -31,21 +30,22 @@ class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInt
     }
 
     $values = $this->getConsumedValues($value, $args, $context, $info);
-    $output = call_user_func_array([$this, 'resolve'], $values);
+    // TODO: Read the cache entry if the resolver is cacheable.
+    if ($this instanceof CacheableDataProducerPluginInterface) {
+      array_push($values, $metadata = new CacheableMetadata());
+    }
 
-    return DeferredUtility::applyFinally($output, function ($value) use ($context) {
-      while ($value instanceof ValueWrapperInterface) {
+    $output = call_user_func_array([$this, 'resolve'], $values);
+    return DeferredUtility::applyFinally($output, function ($value) use ($context, &$metadata) {
+      if ($this instanceof CacheableDataProducerPluginInterface && isset($metadata)) {
+        $context->addCacheableDependency($metadata);
+
         if ($value instanceof CacheableDependencyInterface) {
           $context->addCacheableDependency($value);
         }
-
-        $value = $value->getValue();
       }
 
-      if ($value instanceof CacheableDependencyInterface) {
-        $context->addCacheableDependency($value);
-      }
-
+      // TODO: Write the cache entry (if the value is cacheable).
       return $value;
     });
   }
