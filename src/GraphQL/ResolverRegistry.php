@@ -245,7 +245,7 @@ class ResolverRegistry implements ResolverRegistryInterface {
    * @return callable|null
    */
   public function getRuntimeTypeResolver($value, ResolveContext $context, ResolveInfo $info) {
-    return $this->getTypeResolver($info->returnType);
+    return $this->getTypeResolver(Type::getNamedType($info->returnType)->name);
   }
 
   /**
