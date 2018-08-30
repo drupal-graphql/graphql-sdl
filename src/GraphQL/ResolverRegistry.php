@@ -212,24 +212,9 @@ class ResolverRegistry implements ResolverRegistryInterface {
    * @param \GraphQL\Type\Definition\ResolveInfo $info
    *
    * @return mixed|null
-   * @throws \Drupal\Core\TypedData\Exception\MissingDataException
    */
   public function resolveFieldDefault($value, $args, ResolveContext $context, ResolveInfo $info) {
-    $data = $value instanceof EntityInterface ? $value->getTypedData() : $value;
-    if ($data instanceof ComplexDataInterface) {
-      if (array_key_exists($info->fieldName, $data->getProperties())) {
-        return $data->get($info->fieldName)->getString();
-      }
-    }
-
-    // Fall back to the default field resolver. Note that this is NOT the one
-    // potentially registered with the ExecutionContext because we can't access
-    // it. It's marked private.
-    if (($output = Executor::defaultFieldResolver($value, $args, $context, $info)) !== NULL) {
-      return $output;
-    }
-
-    return NULL;
+    return Executor::defaultFieldResolver($value, $args, $context, $info);
   }
 
   /**
