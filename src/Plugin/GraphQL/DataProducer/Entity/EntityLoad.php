@@ -134,20 +134,11 @@ class EntityLoad extends DataProducerPluginBase implements ContainerFactoryPlugi
         return NULL;
       }
 
-      /** @var \Drupal\Core\Entity\EntityInterface $entity */
-      $access = $entity->access('view', NULL, TRUE);
-      $metadata->addCacheableDependency($access);
-
-      if ($access->isAllowed()) {
-        if (isset($language) && $language != $entity->language()->getId() && $entity instanceof TranslatableInterface) {
-          $entity = $entity->getTranslation($language);
-        }
-
-        return $entity;
+      if (isset($language) && $language != $entity->language()->getId() && $entity instanceof TranslatableInterface) {
+        $entity = $entity->getTranslation($language);
       }
 
-
-      return NULL;
+      return $entity;
     });
   }
 }
