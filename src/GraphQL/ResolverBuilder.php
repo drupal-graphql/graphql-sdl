@@ -89,6 +89,28 @@ class ResolverBuilder {
   }
 
   /**
+   * @param string $id
+   * @param callable|null $parentFn
+   * @param array $argFns
+   *
+   * @return \Closure
+   */
+  public function legacy($id, callable $parentFn = NULL, $argFns = []) {
+    $manager = \Drupal::service('plugin.manager.graphql.field');
+    /** @var \Drupal\graphql\Plugin\GraphQL\Fields\FieldPluginBase $plugin */
+    $plugin = $manager->createInstance($id);
+
+    return function ($parent, $args, ResolveContext $context, ResolveInfo $info) use ($plugin, $parentFn, $argFns) {
+      $parent = isset($parentFn) ? $parentFn($parent, $args, $context, $info) : $parent;
+      $args = array_map(function ($argFn) use ($parent, $args, $context, $info) {
+        return $argFn($parent, $args, $context, $info);
+      }, $argFns);
+
+      return $plugin->resolve($parent, $args, $context, $info);
+    };
+  }
+
+  /**
    * @param $type
    * @param $path
    * @param callable|NULL $value
