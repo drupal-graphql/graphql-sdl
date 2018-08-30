@@ -2,12 +2,20 @@
 
 namespace Drupal\graphql_sdl\GraphQL;
 
+use Drupal\Core\Cache\CacheableDependencyInterface;
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\DataDefinitionInterface;
+use Drupal\Core\TypedData\TypedDataTrait;
 use Drupal\graphql\GraphQL\Execution\ResolveContext;
 use Drupal\graphql_sdl\Utility\DeferredUtility;
+use Drupal\typed_data\DataFetcherTrait;
 use GraphQL\Deferred;
 use GraphQL\Type\Definition\ResolveInfo;
 
 class ResolverBuilder {
+  use TypedDataTrait;
+  use DataFetcherTrait;
 
   /**
    * @param callable ...$resolvers
@@ -81,12 +89,42 @@ class ResolverBuilder {
   }
 
   /**
+   * @param $type
+   * @param $path
+   * @param callable|NULL $value
+   *
+   * @return \Closure
+   */
+  public function fromPath($type, $path, callable $value = NULL) {
+    return function ($parent, $args, ResolveContext $context, ResolveInfo $info) use ($type, $path, $value) {
+      $value = $value ?? $this->fromParent();
+      $value = $value($parent, $args, $context, $info);
+      $metadata = new BubbleableMetadata();
+
+      $type = $type instanceof DataDefinitionInterface ? $type : DataDefinition::create($type);
+      $data = $this->getTypedDataManager()->create($type, $value);
+      $output = $this->getDataFetcher()->fetchDataByPropertyPath($data, $path, $metadata)->getValue();
+
+      $context->addCacheableDependency($metadata);
+      if ($output instanceof CacheableDependencyInterface) {
+        $context->addCacheableDependency($output);
+      }
+
+      return $output;
+    };
+  }
+
+  /**
    * @param $value
    *
    * @return \Closure
    */
   public function fromValue($value) {
-    return function () use ($value) {
+    return function ($parent, $args, ResolveContext $context, ResolveInfo $info) use ($value) {
+      if ($value instanceof CacheableDependencyInterface) {
+        $context->addCacheableDependency($value);
+      }
+
       return $value;
     };
   }
@@ -107,6 +145,10 @@ class ResolverBuilder {
    */
   public function fromParent() {
     return function ($value, $args, ResolveContext $context, ResolveInfo $info) {
+      if ($value instanceof CacheableDependencyInterface) {
+        $context->addCacheableDependency($value);
+      }
+
       return $value;
     };
   }
@@ -119,7 +161,12 @@ class ResolverBuilder {
    */
   public function fromContext($name, $default = NULL) {
     return function ($value, $args, ResolveContext $context, ResolveInfo $info) use ($name, $default) {
-      return $context->getContext($name, $info, $default);
+      $output = $context->getContext($name, $info, $default);
+      if ($output instanceof CacheableDependencyInterface) {
+        $context->addCacheableDependency($output);
+      }
+
+      return $output;
     };
   }
 
