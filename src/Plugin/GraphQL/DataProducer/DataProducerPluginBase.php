@@ -36,7 +36,7 @@ class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInt
     }
 
     $output = call_user_func_array([$this, 'resolve'], $values);
-    return DeferredUtility::applyFinally($output, function ($value) use ($context, &$metadata) {
+    return DeferredUtility::applyFinally($output, function ($value) use ($output, $context, &$metadata) {
       if ($this instanceof CacheableDataProducerPluginInterface && isset($metadata)) {
         $context->addCacheableDependency($metadata);
 
@@ -44,9 +44,6 @@ class DataProducerPluginBase extends PluginBase implements ConfigurablePluginInt
           $context->addCacheableDependency($value);
         }
       }
-
-      // TODO: Write the cache entry (if the value is cacheable).
-      return $value;
     });
   }
 

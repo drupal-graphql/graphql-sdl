@@ -18,7 +18,7 @@ class ResolverBuilder {
   use DataFetcherTrait;
 
   /**
-   * @param callable ...$resolvers
+   * @param callable|callable[] ...$resolvers
    *
    * @return \Closure
    */
@@ -31,8 +31,8 @@ class ResolverBuilder {
         }
 
         if ($value instanceof Deferred) {
-          return DeferredUtility::applyFinally($value, function ($value) use ($resolvers, $args, $context, $info) {
-            return $this->compose(...$resolvers)($value, $args, $context, $info);
+          return DeferredUtility::returnFinally($value, function ($value) use ($resolvers, $args, $context, $info) {
+            return isset($value) ? $this->compose(...$resolvers)($value, $args, $context, $info) : NULL;
           });
         }
       }

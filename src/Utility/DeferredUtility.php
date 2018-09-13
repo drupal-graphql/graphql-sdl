@@ -13,14 +13,13 @@ class DeferredUtility {
    * @return \GraphQL\Deferred
    */
   public static function applyFinally($value, callable $callback) {
-    // Recursively apply this function to deferred results.
     if ($value instanceof Deferred) {
+      // Recursively apply this function to deferred results.
       $value->then(function ($inner) use ($callback) {
         return static::applyFinally($inner, $callback);
       });
     }
     else {
-      // This is the inner (non-deferred) result. Apply the callback.
       $callback($value);
     }
 
@@ -28,15 +27,22 @@ class DeferredUtility {
   }
 
   /**
-   * @param $value
-   * @param $return
+   * @param mixed $value
+   * @param callable $callback
    *
    * @return \GraphQL\Deferred
    */
-  public static function returnFinal($value, $return) {
-    return static::applyFinally($value, function () use ($return) {
-      return $return;
-    });
+  public static function returnFinally($value, callable $callback) {
+    if ($value instanceof Deferred) {
+      // Recursively apply this function to deferred results.
+      return new Deferred(function () use ($value, $callback) {
+        return $value->then(function ($value) use ($callback) {
+          return $callback($value);
+        });
+      });
+    }
+
+    return $callback($value);
   }
 
 }
